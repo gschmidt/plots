@@ -1,12 +1,31 @@
+import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.20/+esm';
+
+let gui = null;
+const params = {
+  seed: 2,
+  noise: .4,
+  count: 11,
+  exp: 3.5,
+  expOffset: 0.5,
+}
+
 let exportSvg = false; 
 const dpi = 96;
-
 const sizeInCm = 20;
 const marginInCm = 1;
 const cmInOneInch = 2.54
 const dimensions = sizeInCm / cmInOneInch * dpi;
 
-function setup() {
+window.setup = function() {
+  gui = new GUI();
+  gui.title("Parameters");
+  gui.add(params, "seed").min(1).max(10).step(1);
+  gui.add(params, "noise").min(0).max(1).step(.1);
+  gui.add(params, "count").min(1).max(17).step(1);
+  gui.add(params, "exp").min(0).max(10);
+  gui.add(params, "expOffset").min(0).max(1);
+  gui.onChange(event => { redraw(); });
+
   setSvgResolutionDPI(dpi);
   createCanvas(dimensions, dimensions);
   background(255);
@@ -15,15 +34,15 @@ function setup() {
   noLoop();
 }
 
-function keyPressed(){
+window.keyPressed = function(){
   if (key == 's') { 
     exportSvg = true; 
     redraw();
   }
 }
 
-function draw() {
-  randomSeed(2);
+window.draw = function() {
+  randomSeed(params.seed);
   background(255); 
   stroke(0);
   noFill();
@@ -39,9 +58,9 @@ function draw() {
 } 
 
 function drawGrid() {
-  const nx = 11;
-  const ny = 11;
-  const noise = .4;
+  const nx = params.count;
+  const ny = params.count;
+  const noise = params.noise;
   
   translate(marginInCm / cmInOneInch * dpi, marginInCm / cmInOneInch * dpi);
   scale((sizeInCm - 2 * marginInCm) / cmInOneInch * dpi);
@@ -65,7 +84,7 @@ function drawGrid() {
 //    drawCell(cdist*noise/10, cdist*noise/10);
 
 //      let fact = (exp(cdist/4)-.5) * noise /6;
-      let fact = (exp(edist*3.5)-.5) * noise /6;
+      let fact = (exp(edist*params.exp) - params.expOffset) * noise /6;
       drawCell(fact, fact);
           
       pop();

@@ -1,0 +1,18 @@
+P5.js reference:
+https://p5js.org/reference
+
+P5 SVG capture implementations:
+https://github.com/golanlevin/p5.plotSvg?tab=readme-ov-file (for plotters)
+https://github.com/zenozeng/p5.js-svg (generic SVG rather than plotters)
+
+Basic dat.GUI:
+https://jasonsturges.medium.com/rapid-prototyping-with-dat-gui-3b1bf062f0a2
+
+axicli docs:
+https://axidraw.com/doc/cli_api/#introduction
+
+
+JSTS library (has polygon inflate/deflate):
+https://github.com/bjornharrtell/jsts?tab=readme-ov-file
+
+
