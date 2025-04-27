@@ -1,5 +1,8 @@
 import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.20/+esm';
 
+// 001: seed 2, noise .4, count 11, exp 3.5, expOffset 0.5
+// 002: seed 2, noise .3, count 11, exp 5.7, expOffset 1
+
 let gui = null;
 const params = {
   seed: 2,
@@ -7,6 +10,7 @@ const params = {
   count: 11,
   exp: 3.5,
   expOffset: 0.5,
+  "Save SVG": () => { exportSvg = true; redraw(); },
 }
 
 let exportSvg = false; 
@@ -24,6 +28,7 @@ window.setup = function() {
   gui.add(params, "count").min(1).max(17).step(1);
   gui.add(params, "exp").min(0).max(10);
   gui.add(params, "expOffset").min(0).max(1);
+  gui.add(params, "Save SVG");
   gui.onChange(event => { redraw(); });
 
   setSvgResolutionDPI(dpi);
@@ -32,13 +37,6 @@ window.setup = function() {
   stroke(0);
   noFill();
   noLoop();
-}
-
-window.keyPressed = function(){
-  if (key == 's') { 
-    exportSvg = true; 
-    redraw();
-  }
 }
 
 window.draw = function() {
