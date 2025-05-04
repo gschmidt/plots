@@ -8,7 +8,9 @@ const params = {
   stepSize: .01,
   rotation: 0,
   drawField: false,
+  drawTangentField: false,
   spacing: .05,
+  lineSpacing: .2,
   "Save SVG": () => { exportSvg = true; redraw(); },
 }
 
@@ -28,7 +30,9 @@ window.setup = function() {
   gui.add(params, "stepSize").min(.001).max(.1);
   gui.add(params, "rotation").min(0).max(2*PI);
   gui.add(params, "drawField");
+  gui.add(params, "drawTangentField");
   gui.add(params, "spacing").min(.01).max(.5);
+  gui.add(params, "lineSpacing").min(.01).max(.5);
   gui.add(params, "Save SVG");
   gui.onChange(event => { redraw(); });
 
@@ -46,7 +50,7 @@ window.draw = function() {
   stroke(0);
   noFill();
   if (exportSvg)
-    beginRecordSVG(this, "circles.svg");
+    beginRecordSVG(this, "flow.svg");
 
   strokeWeight(5/dimensions);
   drawFlow();
@@ -70,6 +74,8 @@ function drawFlow() {
 
   if (params.drawField)
     drawField(testField, .05);
+  if (params.drawTangentField)
+    drawTangentField(testField, .05);
   for (let x = 0; x <= 1; x += .1) {
     for (let y = 0; y <= 1; y += .1) {
       //    point(.5, x);
@@ -77,11 +83,13 @@ function drawFlow() {
     }
   }
 
-  const sample = createPoissonDiskSample(params.spacing, [0,0], [1,1]);
-  for (const p of sample) {
+//  const sample = createPoissonDiskSample(params.spacing, [0,0], [1,1]);
+//  for (const p of sample) {
 //    point(...p);
-    drawFlowLine(testField, ...p);
-  }
+//    drawFlowLine(testField, ...p);
+//  }
+
+  drawEvenlySpacedFlowLines(testField, params.lineSpacing, [0,0], [1,1]);
 }
 
 // field: vector field
@@ -93,21 +101,76 @@ function drawFlowLine(field, sx, sy) {
       points[i][0], points[i][1]);
 }
 
+// Jobard-Lefer
+// https://web.cs.ucdavis.edu/~ma/SIGGRAPH02/course23/notes/papers/Jobard.pdf
+function drawEvenlySpacedFlowLines(field, d, min, max) {
+  const index = new MinimumDistancePointSet(d, [0,0], [1,1]);
+  const potentialSeeds = [];
+  potentialSeeds.push([
+    random(min[0], max[0]),
+    random(min[1], max[1])
+  ]);
+
+  while (potentialSeeds.length) {
+    const pick = floor(random(potentialSeeds.length));
+    const point = potentialSeeds[pick];
+
+    if (point[0] >= min[0] && point[0] <= max[0] &&
+        point[1] >= min[1] && point[1] <= max[1] &&
+        ! index.hasPointNear(...point)) {
+      // Trace a flow line from this point in both directions until it hits other
+      // flow lines or goes out of bounds
+      let currentLine = traceFlowLine(field, ...point, index);
+
+      // Draw it
+      for (let i = 1; i < currentLine.length; i++)
+        line(currentLine[i-1][0], currentLine[i-1][1],
+          currentLine[i][0], currentLine[i][1]);
+ 
+      // Add this flow line to the index so that it will terminate other future lines
+      // that get close to it
+      for (const p of currentLine)
+        index.lossyAddPoint(...p);
+    
+      // Generate "some" additional potential starting points offset from this line
+      for (const p of currentLine) {
+        const vec = field(...p);
+        // XXX assuming the tangent vector has magnitude 1
+        potentialSeeds.push([ p[0] + vec[2] * d, p[1] + vec[3] * d]);
+        potentialSeeds.push([ p[0] - vec[2] * d, p[1] - vec[3] * d]);
+      }
+    }
+
+    potentialSeeds[pick] = potentialSeeds[potentialSeeds.length - 1];
+    potentialSeeds.pop();
+  }
+}
+
 // field: vector field
 // (sx, sy): start position
+// terminateIfNear: optional; if provided, a MinimumDistancePointSet; the flow line will be
+//   terminated if it comes too close to a point in the set (and the set will be
+//   updated as the flow line is drawn)
 // Returns a list of points (each a 2-element list)
-function traceFlowLine(field, sx, sy) {
+function traceFlowLine(field, sx, sy, terminateIfNear) {
   function trace(stepSize) {
     let points = [];
     let x = sx;
     let y = sy;
   
-    while (x >= 0 && x <= 1 && y >=0 && y <= 1) {
+    while (true) {
       // Midpoint method for numerical integration
       let vec = field(x, y);
       let vec2 = field(x + vec[0] * stepSize / 2, y + vec[1] * stepSize / 2);
       let nx = x + vec2[0] * stepSize;
       let ny = y + vec2[1] * stepSize;
+
+      if ( !(nx >= 0 && nx <= 1 && ny >=0 && ny <= 1) )
+        break;
+
+      if (terminateIfNear && terminateIfNear.hasPointNear(nx, ny))
+        break; // XXX may want to use a different distance - paper suggests d/2
+
       points.push([nx, ny]);
       x = nx;
       y = ny;
@@ -146,11 +209,26 @@ function drawField(field, step) {
   }
 }
 
+function drawTangentField(field, step) {
+  for (let x = 0; x <= 1; x += step) {
+    for (let y = 0; y <= 1; y += step) {
+      let vec = field(x + step/2, y + step/2);
+      line(x + step/2, y + step/2,
+        x + step / 2 + vec[2]*step/4, 
+        y + step / 2 + vec[3]*step/4, 
+      );
+    }
+  }
+}
+
 function testField(x, y) {
   let theta = params.rotation;
   theta += sin(x * params.xscale);
   theta += cos(y * params.yscale);
-  return [cos(theta), sin(theta)];
+  return [
+    cos(theta), sin(theta), // vector
+    cos(theta + PI/2), sin(theta + PI/2), // tangent
+  ];
 }
 
 // This represents a set of 2D points with the constraint that no two points in the set
@@ -199,6 +277,14 @@ class MinimumDistancePointSet {
     if (this.cells[index])
       throw new Error("cell already occupied?"); // you broke it
     this.cells[index] = [x, y];
+  }
+
+  // XXX just jam the point in there
+  lossyAddPoint(x, y) {
+    const cell = this._cellContainingPoint(x, y);
+    const index = cell[1] * this.cellCount[0] + cell[0];
+    if (! this.cells[index])
+      this.cells[index] = [x, y];
   }
 
   hasPointNear(x, y) {
