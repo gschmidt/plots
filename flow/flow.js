@@ -67,9 +67,15 @@ function drawFlow() {
   if (params.drawField)
     drawField(testField, .05);
   for (let x = 0; x <= 1; x += .1) {
-//    point(.5, x);
-    drawFlowLine(testField, .5, x);
+    for (let y = 0; y <= 1; y += .1) {
+      //    point(.5, x);
+//    drawFlowLine(testField, x, y);
+    }
   }
+
+  const sample = createPoissonDiskSample(.01, [0,0], [1,1]);
+  for (const p of sample)
+    point(...p);
 }
 
 // field: vector field
@@ -111,6 +117,17 @@ function traceFlowLine(field, sx, sy) {
   return ret;
 }
 
+// field: vector field
+// (sx, sy): start position
+// spacing: spacing between lines
+function drawSpacedFlowLine(field, sx, sy, spacing) {
+  let points = traceFlowLine(field, sx, sy);
+  for (let i = 1; i < points.length; i++)
+    line(points[i-1][0], points[i-1][1],
+      points[i][0], points[i][1]);
+}
+
+
 function drawField(field, step) {
   for (let x = 0; x <= 1; x += step) {
     for (let y = 0; y <= 1; y += step) {
@@ -129,3 +146,138 @@ function testField(x, y) {
   theta += cos(y * params.yscale);
   return [cos(theta), sin(theta)];
 }
+
+// This represents a set of 2D points with the constraint that no two points in the set
+// are within a pre-determined D (Euclidean distance) of each other.
+//
+// See _Fast Poisson Disk Sampling in Arbitrary Dimensions_ by Robert Bridson.
+  // https://www.cs.ubc.ca/~rbridson/docs/bridson-siggraph07-poissondisk.pdf
+class MinimumDistancePointSet {
+  // d: the minimum distance D between points in the set (D)
+  // min, max: two points giving the a bounding rectangle for the points (2-element arrays)
+  constructor(d, min, max) {
+    this.d = d;
+    this.min = min;
+    this.max = max;
+    this.cellSize = d/sqrt(2); // each cell contains at most one point
+    this.cellCount = [
+      ceil((max[0] - min[0]) / this.cellSize),
+      ceil((max[1] - min[1]) / this.cellSize)
+    ];
+    this.cells = new Array(this.cellCount[0] * this.cellCount[1]);
+  }
+
+  _cellContainingPoint(x, y) {
+    let ix = floor((x - this.min[0]) / this.cellSize);
+    let iy = floor((y - this.min[1]) / this.cellSize);
+
+    if (ix < 0 || ix >= this.cellCount[0] ||
+        iy < 0 || iy >= this.cellCount[1])
+      throw new Error("out of bounds");
+
+    return [ix, iy];
+  }
+
+  addPoint(x, y) {
+    if (this.hasPointNear(x, y))
+      throw new Error("violates distance invariant");
+
+    this.fastAddPoint(x, y);
+  }
+
+  // You can use this instead of addPoint if you already know for sure that the point you are
+  // adding is not within D of any existing point.
+  fastAddPoint(x, y) {
+    const cell = this._cellContainingPoint(x, y);
+    const index = cell[1] * this.cellCount[0] + cell[0];
+    if (this.cells[index])
+      throw new Error("cell already occupied?"); // you broke it
+    this.cells[index] = [x, y];
+  }
+
+  hasPointNear(x, y) {
+    let d2 = this.d * this.d;
+
+    // In 2D searching a 5x5 region of cells is sufficient to find any point that could be within
+    // D (given that the cell size is D/sqrt(2)). It is possible to search a smaller number
+    // but that would only be a constant factor speedup.
+    //
+    // 5 is a bound because at worst we need to search ceil(1/cellSize) in each direction,
+    // and cellSize is 1/sqrt(2). 2 cells in each direction beyond the point's cell is 5.
+    let cell = this._cellContainingPoint(x, y);
+    for (let ix = max(cell[0] - 2, 0); ix <= min(cell[0] + 2, this.cellCount[0] - 1); ix ++) {
+      for (let iy = max(cell[1] - 2, 0); iy <= min(cell[1] + 2, this.cellCount[1] - 1); iy ++) {
+        let point = this.cells[iy * this.cellCount[0] + ix];
+        if (point) {
+          let dist2 = (point[0] - x) * (point[0] - x) + (point[1] - y) * (point[1] - y);
+          if (dist2 < d2)
+            return true;
+        }
+      }
+    }
+
+    return false;
+  }
+}
+
+// window.MinimumDistancePointSet = MinimumDistancePointSet;
+
+function createPoissonDiskSample(d, min, max) {
+  const k = 30; // tries before we conclude that the neighborhood of a point is full
+  const active = [];
+  const points = [];
+  const index = new MinimumDistancePointSet(d, min, max);
+
+  function selectPoint(x, y) {
+    active.push([x, y]);
+    points.push([x, y]);
+    index.addPoint(x, y); // fastAddPoint should be safe here
+ }
+
+  // Seed point
+  const sx = random(min[0], max[0]);
+  const sy = random(min[1], max[1]);
+  selectPoint(sx, sy);
+
+  while (active.length > 0) {
+    const pick = floor(random(active.length));
+    const oldPoint = active[pick];
+    let newPoint;
+
+    for (let tries = 0; tries < k; tries ++) {
+      // Select a point uniformly from those that are within d and 2d of oldPoint
+      // https://stackoverflow.com/questions/5837572/generate-a-random-point-within-a-circle-uniformly
+      const theta = random(0, 2*PI);
+      const r = sqrt(random(d * d, 2 * d * 2 * d));
+      const x = oldPoint[0] + r * cos(theta);
+      const y = oldPoint[1] + r * sin(theta);
+
+      // Reject points that are out of bounds
+      if (x < min[0] || x > max[1] ||
+          y < min[0] || y > max[1]) {
+        tries++;
+        continue;
+      }
+  
+      if (! index.hasPointNear(x, y)) {
+        newPoint = [x, y];
+        console.log(`selected point in ${tries + 1} tries`);
+        break;
+      }
+    }
+
+    if (! newPoint) {
+      // Can't find a valid newPoint near oldPoint after k tries. Remove from active list
+      active[index] = active[active.length - 1];
+      active.pop();
+      console.log(`removing point, ${active.length} left`);
+      continue;
+    }
+
+    selectPoint(...newPoint);
+  }
+
+  return points;
+}
+
+window.createPoissonDiskSample = createPoissonDiskSample;
