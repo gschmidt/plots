@@ -10,6 +10,7 @@ const params = {
   count: 11,
   exp: 3.5,
   expOffset: 0.5,
+  rotation: 0,
   "Save SVG": () => { exportSvg = true; redraw(); },
 }
 
@@ -24,10 +25,11 @@ window.setup = function() {
   gui = new GUI();
   gui.title("Parameters");
   gui.add(params, "seed").min(1).max(10).step(1);
-  gui.add(params, "noise").min(0).max(1).step(.1);
+  gui.add(params, "noise").min(0).max(1);
   gui.add(params, "count").min(1).max(17).step(1);
   gui.add(params, "exp").min(0).max(10);
   gui.add(params, "expOffset").min(0).max(1);
+  gui.add(params, "rotation").min(0).max(2*PI);
   gui.add(params, "Save SVG");
   gui.onChange(event => { redraw(); });
 
@@ -91,6 +93,7 @@ function drawGrid() {
 }
 
 function drawCell(rx, ry) {
+  rotate(params.rotation);
   for (let i = 0; i < 10; i ++) {
     circle(random(-rx/2, rx/2), random(-ry/2, ry/2), 1 - i*.1);
   }
