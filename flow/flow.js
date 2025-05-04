@@ -5,10 +5,11 @@ const params = {
   seed: 2,
   xscale: 8.5,
   yscale: 5,
-//  magScale: 1,
+  magScale: 1,
   stepSize: .01,
   rotation: 0,
   drawField: false,
+  integrator: "euler",
   "Save SVG": () => { exportSvg = true; redraw(); },
 }
 
@@ -25,10 +26,11 @@ window.setup = function() {
   gui.add(params, "seed").min(1).max(10).step(1);
   gui.add(params, "xscale").min(0).max(10);
   gui.add(params, "yscale").min(0).max(10);
-//  gui.add(params, "magScale").min(0).max(10);
+  gui.add(params, "magScale").min(0).max(10);
   gui.add(params, "stepSize").min(.001).max(.1);
   gui.add(params, "rotation").min(0).max(2*PI);
   gui.add(params, "drawField");
+  gui.add(params, "integrator", ["euler", "midpoint"]);
   gui.add(params, "Save SVG");
   gui.onChange(event => { redraw(); });
 
@@ -69,14 +71,17 @@ function drawFlow() {
   if (params.drawField)
     drawField(testField, .05);
   for (let x = 0; x <= 1; x += .1) {
-    point(.5, x);
-    drawFlowLine(testField, .5, x);
+//    point(.5, x);
+    if (params.integrator === "euler")
+      drawFlowLineEuler(testField, .5, x);
+    else
+      drawFlowLineMidpoint(testField, .5, x);
   }
 }
 
 // field: vector field
 // (sx, sy): start position
-function drawFlowLine(field, sx, sy) {
+function drawFlowLineEuler(field, sx, sy) {
   function trace(stepSize) {
     let x = sx;
     let y = sy;
@@ -95,6 +100,27 @@ function drawFlowLine(field, sx, sy) {
   trace(-params.stepSize);
 }
 
+function drawFlowLineMidpoint(field, sx, sy) {
+  function trace(stepSize) {
+    let x = sx;
+    let y = sy;
+  
+    while (x >= 0 && x <= 1 && y >=0 && y <= 1) {
+      let vec = field(x, y);
+      let vec2 = field(x + vec[0] * stepSize / 2, y + vec[1] * stepSize / 2);
+      let nx = x + vec2[0] * stepSize;
+      let ny = y + vec2[1] * stepSize;
+      line(x, y, nx, ny);
+      x = nx;
+      y = ny;
+    }
+  }
+
+  trace(params.stepSize);
+  trace(-params.stepSize);
+}
+
+
 function drawField(field, step) {
   for (let x = 0; x <= 1; x += step) {
     for (let y = 0; y <= 1; y += step) {
@@ -111,8 +137,8 @@ function testField(x, y) {
   let theta = params.rotation;
   theta += sin(x * params.xscale);
   theta += cos(y * params.yscale);
-//  let dist2 = abs(x-.5)*abs(x-.5)+abs(y-.5)*abs(y-.5);
-//  let mag = sqrt(dist2) * params.magScale;
-  let mag = 1; // If we're going to integrate them only the distance matters?
+  let dist2 = abs(x-.5)*abs(x-.5)+abs(y-.5)*abs(y-.5);
+  let mag = sqrt(dist2) * params.magScale + .01;
+//  let mag = 1; // If we're going to integrate them only the direction matters?
   return [cos(theta) * mag, sin(theta) * mag];
 }
