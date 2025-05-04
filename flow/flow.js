@@ -1,5 +1,8 @@
 import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.20/+esm';
 
+// test-2: seed 2, xscale 6.99, yscale 7.48, stepSize 0.00565,
+//         rotation 2.38132, lineSpacing 0.01539
+
 let gui = null;
 const params = {
   seed: 2,
