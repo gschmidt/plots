@@ -1,0 +1,6 @@
+{
+    "port": 8000,
+    "ui": false,
+    "notify": false,
+    "open": false
+}
