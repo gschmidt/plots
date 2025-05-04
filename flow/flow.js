@@ -104,46 +104,54 @@ function drawFlowLine(field, sx, sy) {
 // Jobard-Lefer
 // https://web.cs.ucdavis.edu/~ma/SIGGRAPH02/course23/notes/papers/Jobard.pdf
 function drawEvenlySpacedFlowLines(field, d, min, max) {
-  const index = new MinimumDistancePointSet(d, [0,0], [1,1]);
-  const potentialSeeds = [];
-  potentialSeeds.push([
+  // Divide by two per paper (termination distance is half the line spacing distance)
+  const index = new MinimumDistancePointSet(d / 2, [0,0], [1,1]);
+  const lines = [];
+  let nextLine = 0;
+
+  function addLine(x, y) {
+    if (x < min[0] || x > max[0] ||
+        y < min[1] || y > max[1] ||
+        index.hasPointNear(x, y))
+      return;
+
+    // Trace a flow line from this point in both directions until it hits other
+    // flow lines or goes out of bounds
+    let thisLine = traceFlowLine(field, x, y, index);
+    if (thisLine.length < 10)
+      return;
+    lines.push(thisLine);
+
+    // Draw it
+    for (let i = 1; i < thisLine.length; i++)
+      line(thisLine[i-1][0], thisLine[i-1][1], thisLine[i][0], thisLine[i][1]);
+
+    // Add this flow line to the index so that it will terminate other future lines
+    // that get close to it
+    for (const p of thisLine)
+      index.lossyAddPoint(...p);
+  }
+
+  // First line from a random point
+  addLine(
     random(min[0], max[0]),
     random(min[1], max[1])
-  ]);
+  );
 
-  while (potentialSeeds.length) {
-    const pick = floor(random(potentialSeeds.length));
-    const point = potentialSeeds[pick];
+  while (nextLine < lines.length) {
+    let thisLine = lines[nextLine];
+    nextLine ++;
 
-    if (point[0] >= min[0] && point[0] <= max[0] &&
-        point[1] >= min[1] && point[1] <= max[1] &&
-        ! index.hasPointNear(...point)) {
-      // Trace a flow line from this point in both directions until it hits other
-      // flow lines or goes out of bounds
-      let currentLine = traceFlowLine(field, ...point, index);
-
-      // Draw it
-      for (let i = 1; i < currentLine.length; i++)
-        line(currentLine[i-1][0], currentLine[i-1][1],
-          currentLine[i][0], currentLine[i][1]);
- 
-      // Add this flow line to the index so that it will terminate other future lines
-      // that get close to it
-      for (const p of currentLine)
-        index.lossyAddPoint(...p);
-    
-      // Generate "some" additional potential starting points offset from this line
-      for (const p of currentLine) {
-        const vec = field(...p);
-        // XXX assuming the tangent vector has magnitude 1
-        potentialSeeds.push([ p[0] + vec[2] * d, p[1] + vec[3] * d]);
-        potentialSeeds.push([ p[0] - vec[2] * d, p[1] - vec[3] * d]);
-      }
+    // Try to draw more lines offset from this line
+    for (const p of thisLine) {
+      const vec = field(...p);
+      // XXX assuming the tangent vector has magnitude 1
+      addLine(p[0] + vec[2] * d, p[1] + vec[3] * d);
+      addLine(p[0] - vec[2] * d, p[1] - vec[3] * d);
     }
-
-    potentialSeeds[pick] = potentialSeeds[potentialSeeds.length - 1];
-    potentialSeeds.pop();
   }
+
+  return lines;
 }
 
 // field: vector field
