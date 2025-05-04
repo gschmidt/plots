@@ -8,6 +8,7 @@ const params = {
   stepSize: .01,
   rotation: 0,
   drawField: false,
+  spacing: .05,
   "Save SVG": () => { exportSvg = true; redraw(); },
 }
 
@@ -27,6 +28,7 @@ window.setup = function() {
   gui.add(params, "stepSize").min(.001).max(.1);
   gui.add(params, "rotation").min(0).max(2*PI);
   gui.add(params, "drawField");
+  gui.add(params, "spacing").min(.01).max(.5);
   gui.add(params, "Save SVG");
   gui.onChange(event => { redraw(); });
 
@@ -64,6 +66,8 @@ function drawFlow() {
   scale(1, -1);
   translate(0, -1);
 
+  rect(0,0,1,1);
+
   if (params.drawField)
     drawField(testField, .05);
   for (let x = 0; x <= 1; x += .1) {
@@ -73,9 +77,11 @@ function drawFlow() {
     }
   }
 
-  const sample = createPoissonDiskSample(.01, [0,0], [1,1]);
-  for (const p of sample)
-    point(...p);
+  const sample = createPoissonDiskSample(params.spacing, [0,0], [1,1]);
+  for (const p of sample) {
+//    point(...p);
+    drawFlowLine(testField, ...p);
+  }
 }
 
 // field: vector field
@@ -220,8 +226,6 @@ class MinimumDistancePointSet {
   }
 }
 
-// window.MinimumDistancePointSet = MinimumDistancePointSet;
-
 function createPoissonDiskSample(d, min, max) {
   const k = 30; // tries before we conclude that the neighborhood of a point is full
   const active = [];
@@ -231,7 +235,7 @@ function createPoissonDiskSample(d, min, max) {
   function selectPoint(x, y) {
     active.push([x, y]);
     points.push([x, y]);
-    index.addPoint(x, y); // fastAddPoint should be safe here
+    index.fastAddPoint(x, y); // fastAddPoint should be safe here
  }
 
   // Seed point
@@ -261,16 +265,14 @@ function createPoissonDiskSample(d, min, max) {
   
       if (! index.hasPointNear(x, y)) {
         newPoint = [x, y];
-        console.log(`selected point in ${tries + 1} tries`);
         break;
       }
     }
 
     if (! newPoint) {
       // Can't find a valid newPoint near oldPoint after k tries. Remove from active list
-      active[index] = active[active.length - 1];
+      active[pick] = active[active.length - 1];
       active.pop();
-      console.log(`removing point, ${active.length} left`);
       continue;
     }
 
@@ -280,4 +282,5 @@ function createPoissonDiskSample(d, min, max) {
   return points;
 }
 
-window.createPoissonDiskSample = createPoissonDiskSample;
+// window.MinimumDistancePointSet = MinimumDistancePointSet;
+// window.createPoissonDiskSample = createPoissonDiskSample;
