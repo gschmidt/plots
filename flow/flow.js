@@ -75,7 +75,18 @@ function drawFlow() {
 // field: vector field
 // (sx, sy): start position
 function drawFlowLine(field, sx, sy) {
+  let points = traceFlowLine(field, sx, sy);
+  for (let i = 1; i < points.length; i++)
+    line(points[i-1][0], points[i-1][1],
+      points[i][0], points[i][1]);
+}
+
+// field: vector field
+// (sx, sy): start position
+// Returns a list of points (each a 2-element list)
+function traceFlowLine(field, sx, sy) {
   function trace(stepSize) {
+    let points = [];
     let x = sx;
     let y = sy;
   
@@ -85,14 +96,19 @@ function drawFlowLine(field, sx, sy) {
       let vec2 = field(x + vec[0] * stepSize / 2, y + vec[1] * stepSize / 2);
       let nx = x + vec2[0] * stepSize;
       let ny = y + vec2[1] * stepSize;
-      line(x, y, nx, ny);
+      points.push([nx, ny]);
       x = nx;
       y = ny;
     }
+
+    return points;
   }
 
-  trace(params.stepSize);
-  trace(-params.stepSize);
+  let ret = trace(-params.stepSize);
+  ret.reverse();
+  ret.push([sx, sy]);
+  ret.push(...trace(params.stepSize));
+  return ret;
 }
 
 function drawField(field, step) {
