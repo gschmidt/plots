@@ -13,7 +13,7 @@ const params = {
   drawField: false,
   drawTangentField: false,
   spacing: .05,
-  lineSpacing: .2,
+  lineSpacing: .1,
   "Save SVG": () => { exportSvg = true; redraw(); },
 }
 
@@ -35,7 +35,7 @@ window.setup = function() {
   gui.add(params, "drawField");
   gui.add(params, "drawTangentField");
   gui.add(params, "spacing").min(.01).max(.5);
-  gui.add(params, "lineSpacing").min(.01).max(.5);
+  gui.add(params, "lineSpacing").min(.01).max(.1);
   gui.add(params, "Save SVG");
   gui.onChange(event => { redraw(); });
 
